@@ -1,0 +1,125 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 0. Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isEmailVerified() {
+      return request.auth.token.email_verified == true;
+    }
+
+    function getProfile() {
+      return get(/databases/$(database)/documents/settings/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'ayahnieda@gmail.com' ||
+        getProfile().role == 'pm'
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Project Security ---
+
+    function isValidProject(data) {
+      return data.title is string && data.title.size() <= 200
+          && data.client is string && data.client.size() <= 100
+          && data.duration is number && data.duration >= 0
+          && (data.status in ['project-entry', 'translation-phase', 'editing-phase', 'qc-phase', 'done', 'under-revision', 'revision-review'])
+          && data.updatedAt == request.time;
+    }
+
+    match /projects/{projectId} {
+      // Identity Protection & ID Hardening
+      allow get: if isSignedIn() && isValidId(projectId) && (
+        isAdmin() || 
+        request.auth.uid in resource.data.memberRoles ||
+        resource.data.ownerId == request.auth.uid
+      );
+
+      // Secure List Queries: Explicitly filter by member role or ownership
+      allow list: if isSignedIn() && (
+        isAdmin() || 
+        request.auth.uid in resource.data.memberRoles ||
+        resource.data.ownerId == request.auth.uid
+      );
+
+      allow create: if isSignedIn() && isEmailVerified() && (
+        isAdmin() || getProfile().role == 'pm'
+      ) && isValidProject(incoming()) && (
+        incoming().ownerId == request.auth.uid &&
+        incoming().createdAt == request.time
+      );
+
+      allow update: if isSignedIn() && isEmailVerified() && (
+        // Hierarchical update permissions
+        (isAdmin() || getProfile().role == 'pm' || existing().ownerId == request.auth.uid) ||
+        (request.auth.uid in existing().memberRoles)
+      ) && isValidProject(incoming()) && (
+        // Prevent field-poisoning: restricted fields can only be changed by PM/Admin
+        (isAdmin() || getProfile().role == 'pm' || incoming().diff(existing()).affectedKeys().hasOnly(['stages', 'status', 'updatedAt']))
+      );
+
+      allow delete: if isAdmin() || (isSignedIn() && existing().ownerId == request.auth.uid);
+    }
+
+    // --- User Settings (Profiles) ---
+    
+    function isValidProfile(data) {
+      return data.name is string && data.name.size() <= 100
+          && (data.role in ['pm', 'editor', 'translator', 'head_translator', 'head_editor', 'head_qc', 'breakdown']);
+    }
+
+    match /settings/{userId} {
+      allow read: if isSignedIn(); // Allow reading staff names
+      
+      allow create: if isOwner(userId) && isValidProfile(incoming());
+      
+      allow update: if isOwner(userId) && isValidProfile(incoming()) && (
+        // Prevent Self-Promotion: Users cannot change their own role unless they are already PM or it's an admin override
+        (incoming().role == existing().role || isAdmin())
+      );
+      
+      allow delete: if isAdmin();
+    }
+
+    // --- Notifications ---
+
+    match /notifications/{notifId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn(); // Allow system or heads to send alerts
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+    
+    // --- System Logs ---
+    match /logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn();
+    }
+  }
+}

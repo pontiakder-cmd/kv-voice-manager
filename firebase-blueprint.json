@@ -1,0 +1,91 @@
+{
+  "entities": {
+    "ProjectStage": {
+      "title": "ProjectStage",
+      "type": "object",
+      "properties": {
+        "status": { "type": "string", "enum": ["pending", "in_progress", "review", "approved", "rejected"] },
+        "assignedAt": { "type": "string", "format": "date-time" },
+        "startedAt": { "type": "string", "format": "date-time" },
+        "completedAt": { "type": "string", "format": "date-time" },
+        "feedback": { "type": "string" },
+        "staffIds": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "Project": {
+      "title": "Project",
+      "description": "Sequential Production Workflow Project with Hierarchical Delegation",
+      "type": "object",
+      "properties": {
+        "projectCode": { "type": "string" },
+        "client": { "type": "string" },
+        "title": { "type": "string" },
+        "deadline": { "type": "string", "format": "date" },
+        "duration": { "type": "number" },
+        "serviceType": { "type": "string", "enum": ["dubbing", "subtitling", "transkreasi"] },
+        "status": { "type": "string", "enum": ["project-entry", "translation-phase", "editing-phase", "qc-phase", "done", "under-revision", "revision-review"] },
+        "translators": { "type": "array", "items": { "type": "string" } },
+        "headTranslator": { "type": "string" },
+        "editors": { "type": "array", "items": { "type": "string" } },
+        "headEditor": { "type": "string" },
+        "qcStaff": { "type": "array", "items": { "type": "string" } },
+        "headQC": { "type": "string" },
+        "isRevision": { "type": "boolean" },
+        "revisionCategory": { "type": "string", "enum": ["translation", "editing", "qc"] },
+        "revisionHistory": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "category": { "type": "string" },
+              "feedback": { "type": "string" },
+              "requestedBy": { "type": "string" },
+              "createdAt": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        "stages": {
+          "type": "object",
+          "properties": {
+            "translation": { "$ref": "#/entities/ProjectStage" },
+            "editing": { "$ref": "#/entities/ProjectStage" },
+            "qc": { "$ref": "#/entities/ProjectStage" }
+          }
+        },
+        "memberRoles": {
+          "type": "object",
+          "additionalProperties": { "type": "string", "enum": ["pm", "translator", "head_translator", "editor", "head_editor", "qc", "head_qc"] }
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["client", "title", "duration", "status"]
+    },
+    "Settings": {
+      "title": "Settings",
+      "description": "Global system configuration",
+      "type": "object",
+      "properties": {
+        "reminders": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "frequency": { "type": "string", "enum": ["daily", "weekly"] },
+            "time": { "type": "string" }
+          },
+          "required": ["enabled", "frequency", "time"]
+        }
+      }
+    }
+  },
+  "firestore": {
+    "/projects/{projectId}": {
+      "schema": "Project",
+      "description": "List of all voice production projects"
+    },
+    "/settings/global": {
+      "schema": "Settings",
+      "description": "Global configuration settings"
+    }
+  }
+}

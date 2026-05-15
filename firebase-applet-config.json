@@ -1,0 +1,11 @@
+{
+  "projectId": "kv-workflow",
+  "appId": "1:568733096895:web:c8d29452bf41dddcc09f0a",
+  "apiKey": "AIzaSyCgHdjVYGp57ROzDh5wwcOMZ-RKq2SqdjI",
+  "authDomain": "kv-workflow.firebaseapp.com",
+  "databaseURL": "https://kv-workflow-default-rtdb.asia-southeast1.firebasedatabase.app",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "kv-workflow.firebasestorage.app",
+  "messagingSenderId": "568733096895",
+  "measurementId": ""
+}
